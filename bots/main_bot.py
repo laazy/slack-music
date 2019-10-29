@@ -27,7 +27,19 @@ def playnext(n):
         elif n['type'] == 'localid':
             name = os.listdir(localstorage)[int(localid)]
             _thread.start_new_thread(playone, (localstorage + '/' + name,))
+        elif n['type'] == 'playlist':
+            if n['len'] > n['index']:
+                musicUrl = requests.get(musicApi + '/song/url?id=%s' % (n['src']['playlist']['tracks'][n['index']]['id']))
+                res = json.loads(musicUrl.text)
+                n['song'] = n['src']['playlist']['tracks'][n['index']]['name']
+                n['index'] = n['index'] + 1
+                _thread.start_new_thread(playone, (res['data'][0]['url'],))
+            else:
+                music_queue.put({'action': 'nextp'})
+
     except Exception as e:
+        # skip this one
+        music_queue.put({'action': 'next'})
         print(e)
 
 def playone(url):
@@ -41,11 +53,18 @@ music_list = []
 def playing():
     while True:
         msg = music_queue.get()
-        print(msg)
         if msg['action'] == 'add':
             music_list.append(msg['music'])
         elif msg['action'] == 'next':
             os.system('killall mplayer')
+            if len(music_list) > 0 and music_list[0]['type'] == 'playlist':
+                playnext(music_list[0])
+            elif len(music_list) > 1:
+                playnext(music_list[1])
+                music_list.pop(0)
+            elif len(music_list) > 0:
+                playnext(music_list[0])
+        elif msg['action'] == 'nextp':
             if len(music_list) > 1:
                 playnext(music_list[1])
                 music_list.pop(0)
@@ -56,49 +75,59 @@ def playing():
         elif msg['action'] == 'start':
             if len(music_list) > 0:
                 playnext(music_list[0])
-        elif msg['action'] == 'show':
-            msg['callback'](music_list)
 
 _thread.start_new_thread(playing, ())
 
 @respond_to('addid (.*)')
-def playid(message, music):
-    music_queue.put({'action': 'add', 'music': {'type':'id', 'src': music}})
+def add(message, music):
     message.reply('success')
-
+    music_queue.put({'action': 'add', 'music': {'type':'id', 'src': music, 'from': message.user['real_name']}})
+    
 @respond_to('add (.*)')
-def play(message, keyword):
+def add(message, keyword):
     message.reply('success')
-    music_queue.put({"action": "add", "music": {"type": "keyword", "src": keyword}})
+    music_queue.put({"action": "add", "music": {"type": "keyword", "src": keyword, 'from': message.user['real_name']}})
 
-@respond_to('addln (.*)')
-def play(message, name):
+@respond_to('addp (.*)')
+def add(message, id):
+    try:
+        res = json.loads(requests.get(musicApi + '/playlist/detail?id=%s&s=0' % (id)).text)
+        music_queue.put({"action": "add", "music": {"type": "playlist", "src": res, 'id': id, 'index': 0, 'song': res['playlist']['tracks'][0]['name'], 'len': len(res['playlist']['tracks']), 'from': message.user['real_name']}})
+        message.reply('success')
+    except:
+        message.reply('something wrong')
+
+@respond_to('addln (.*)', re.IGNORECASE)
+def add(message, name):
     message.reply('success')
-    music_queue.put({"action": "add", "music": {"type": "localn", "src": name}})
+    music_queue.put({"action": "add", "music": {"type": "localn", "src": name, 'from': message.user['real_name']}})
 
-@respond_to('addli (.*)')
-def play(message, name):
+@respond_to('addli (.*)', re.IGNORECASE)
+def add(message, name):
     message.reply('success')
-    music_queue.put({"action": "add", "music": {"type": "localid", "src": name}})
+    music_queue.put({"action": "add", "music": {"type": "localid", "src": name, 'from': message.user['real_name']}})
 
-
-@respond_to('start')
-def stop(message):
+@respond_to('start', re.IGNORECASE)
+def start(message):
     message.reply('success')
     music_queue.put({"action": "start"})
     
-
-@respond_to('stop')
+@respond_to('stop', re.IGNORECASE)
 def stop(message):
     message.reply('success')
     music_queue.put({"action": "stop"})
 
-@respond_to('next')
-def stop(message):
+@respond_to('next', re.IGNORECASE)
+def next(message):
     message.reply('success')
     music_queue.put({"action": "next"})
 
-@respond_to('list (.*)')
+@respond_to('nextp', re.IGNORECASE)
+def nextp(message):
+    message.reply('success')
+    music_queue.put({"action": "nextp"})
+
+@respond_to('list (.*)', re.IGNORECASE)
 def listM(message, keywords):
     try:
         res = json.loads(requests.get(musicApi + '/search?limit=8&keywords=' + keywords).text)
@@ -113,7 +142,29 @@ def listM(message, keywords):
         print(e)
         message.reply('something wrong')
 
-@respond_to('local (.*)')
+@respond_to('listp (.*)', re.IGNORECASE)
+def listP(message, keywords):
+    try:
+        res = json.loads(requests.get(musicApi + '/search?limit=12&type=1000&keywords=' + keywords).text)
+        for playlist in res['result']['playlists']:
+            message.reply('id: %s %s 歌单长度：%s' % (playlist['id'], playlist['name'], playlist['trackCount']))
+    except Exception as e:
+        print(e)
+        message.reply('something wrong')
+
+@respond_to('detailp ([0-9]) ([0-9])', re.IGNORECASE)
+def detailP(message, id, offset):
+    try:
+        res = json.loads(requests.get(musicApi + '/playlist/detail?id=%s&s=0' + id).text)
+        i = 0
+        for track in res['playlist']['tracks'][offset:offset+10]:
+            message.reply('id: %s name: %s index: %d' % (track['id'], track['name'], offset+i))
+            i = i + 1
+    except Exception as e:
+        print(e)
+        message.reply('something wrong')
+
+@respond_to('local (.*)', re.IGNORECASE)
 def locals(message, start=0):
     try:
         for i in os.listdir(localstorage)[int(start):int(start)+10]:
@@ -122,7 +173,7 @@ def locals(message, start=0):
         print(e)
         message.reply('out of range')
 
-@respond_to('localnum')
+@respond_to('localnum', re.IGNORECASE)
 def localnum(message):
     try:
         message.reply(str(len(os.listdir(localstorage))))
@@ -135,7 +186,10 @@ def show(message):
     try:
         i = 1
         for m in music_list:
-            message.reply('%d: ' %(i) + json.dumps(m, ensure_ascii=False))
+            if m['type'] == 'playlist':
+                message.reply('%d: 歌名：%s 歌单id：%s 第%d首 from: %s' % (i, m['song'], m['id'], m['index'], m['from']))
+            else:
+                message.reply('%d: 歌名orID：%s from: %s' %(i, m['src'], m['from']))
             i += 1
     except Exception as e:
         print(e)
@@ -143,10 +197,17 @@ def show(message):
 
 @respond_to('help')
 def help(message):
-    message.reply("""list %s 关键字搜索
-    add %s 播放歌曲（使用关键字搜索出的第一条）
-    addid %d 指定id播放歌曲
+    message.reply("""
+    list %s 关键字搜索单曲
+    listp %s 关键字搜索歌单
+    add %s 添加歌曲（使用关键字搜索出的第一条）
+    addp %s 添加指定id歌单
+    detailp %s %d 查看指定id歌单的详情，需要填入offset，只返回10条结果
+    addid %d 添加指定id歌曲
+    addln %s （本地）添加歌曲
+    addli %d （本地）添加指定id歌曲
     show    查看排队列表
     start   开始播放
-    next    下一首歌
+    next    下一首歌（如果在播放歌单，则为歌单中下一首）
+    nextp   跳过当前歌单（跳到下一个记录）
     stop    停止播放""")
