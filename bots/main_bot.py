@@ -171,12 +171,13 @@ def detailP(message, id, offset):
         print(e)
         message.reply('something wrong')
 
-@respond_to("top (\d+)")
+@respond_to(r"top (\d+)")
 def top(message, id):
-    if id >= len(music_list) or id < 1:
-        message.reply("顶歌失败")
+    id = int(id)
+    if id > len(music_list) or id < 2:
+        message.reply("顶歌失败,id不正确")
     else:
-        music_queue.put({"action": "top", "music": music_list[int(id)]})
+        music_queue.put({"action": "top", "music": music_list[id + 1]})
         message.reply("顶歌成功")
 
 @respond_to('local (.*)', re.IGNORECASE)
