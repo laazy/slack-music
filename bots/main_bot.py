@@ -76,8 +76,13 @@ def playing():
             if len(music_list) > 0:
                 playnext(music_list[0])
         elif msg['action'] == 'top':
-            music_list[0] == msg['music']
-            music_list.remove(msg['music'])
+            music = msg['music']
+            if music not in music_list or music_list.index(music) == 1:
+                continue
+            music_list.remove(music)
+            music_list.insert(1, music)
+            
+
 
 _thread.start_new_thread(playing, ())
 
@@ -175,9 +180,9 @@ def detailP(message, id, offset):
 def top(message, id):
     id = int(id)
     if id > len(music_list) or id < 2:
-        message.reply("顶歌失败,id不正确")
+        message.reply("顶歌失败,id不正确 ")
     else:
-        music_queue.put({"action": "top", "music": music_list[id + 1]})
+        music_queue.put({"action": "top", "music": music_list[id - 1]})
         message.reply("顶歌成功")
 
 @respond_to('local (.*)', re.IGNORECASE)
