@@ -117,15 +117,17 @@ def stop(message):
     message.reply('success')
     music_queue.put({"action": "stop"})
 
-@respond_to('next', re.IGNORECASE)
+@respond_to('nextp$', re.IGNORECASE)
+def nextp(message):
+    message.reply('success')
+    music_queue.put({"action": "nextp"})
+
+@respond_to('next$', re.IGNORECASE)
 def next(message):
     message.reply('success')
     music_queue.put({"action": "next"})
 
-@respond_to('nextp', re.IGNORECASE)
-def nextp(message):
-    message.reply('success')
-    music_queue.put({"action": "nextp"})
+
 
 @respond_to('list (.*)', re.IGNORECASE)
 def listM(message, keywords):
@@ -152,13 +154,15 @@ def listP(message, keywords):
         print(e)
         message.reply('something wrong')
 
-@respond_to('detailp ([0-9]) ([0-9])', re.IGNORECASE)
+@respond_to('detailp ([0-9]*) ([0-9]*)', re.IGNORECASE)
 def detailP(message, id, offset):
     try:
-        res = json.loads(requests.get(musicApi + '/playlist/detail?id=%s&s=0' + id).text)
+        res = json.loads(requests.get(musicApi + '/playlist/detail?s=0&id=%s' % (id)).text)
         i = 0
-        for track in res['playlist']['tracks'][offset:offset+10]:
-            message.reply('id: %s name: %s index: %d' % (track['id'], track['name'], offset+i))
+        ioff = int(offset) 
+        message.reply('歌单总长度：%d' % (len(res['playlist']['tracks'])))                               
+        for track in res['playlist']['tracks'][ioff:ioff+10]:
+            message.reply('id: %s name: %s index: %d' % (track['id'], track['name'], ioff+i))
             i = i + 1
     except Exception as e:
         print(e)
