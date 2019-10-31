@@ -65,6 +65,7 @@ def playing():
             elif len(music_list) > 0:
                 playnext(music_list[0])
         elif msg['action'] == 'nextp':
+            os.system('killall mplayer')
             if len(music_list) > 1:
                 playnext(music_list[1])
                 music_list.pop(0)
