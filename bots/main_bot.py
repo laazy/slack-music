@@ -75,11 +75,14 @@ def playing():
         elif msg['action'] == 'start':
             if len(music_list) > 0:
                 playnext(music_list[0])
+        elif msg['action'] == 'top':
+            music_list[0] == msg['music']
+            music_list.remove(msg['music'])
 
 _thread.start_new_thread(playing, ())
 
 @respond_to('addid (.*)')
-def add(message, music):
+def addid(message, music):
     message.reply('success')
     music_queue.put({'action': 'add', 'music': {'type':'id', 'src': music, 'from': message.user['real_name']}})
     
@@ -89,7 +92,7 @@ def add(message, keyword):
     music_queue.put({"action": "add", "music": {"type": "keyword", "src": keyword, 'from': message.user['real_name']}})
 
 @respond_to('addp (.*)')
-def add(message, id):
+def addp(message, id):
     try:
         res = json.loads(requests.get(musicApi + '/playlist/detail?id=%s&s=0' % (id)).text)
         music_queue.put({"action": "add", "music": {"type": "playlist", "src": res, 'id': id, 'index': 0, 'song': res['playlist']['tracks'][0]['name'], 'len': len(res['playlist']['tracks']), 'from': message.user['real_name']}})
@@ -98,12 +101,12 @@ def add(message, id):
         message.reply('something wrong')
 
 @respond_to('addln (.*)', re.IGNORECASE)
-def add(message, name):
+def addln(message, name):
     message.reply('success')
     music_queue.put({"action": "add", "music": {"type": "localn", "src": name, 'from': message.user['real_name']}})
 
 @respond_to('addli (.*)', re.IGNORECASE)
-def add(message, name):
+def addli(message, name):
     message.reply('success')
     music_queue.put({"action": "add", "music": {"type": "localid", "src": name, 'from': message.user['real_name']}})
 
@@ -164,6 +167,14 @@ def detailP(message, id, offset):
         print(e)
         message.reply('something wrong')
 
+@respond_to("top (\d+)")
+def top(message, id):
+    if id >= len(music_list) or id < 1:
+        message.reply("顶歌失败")
+    else:
+        music_queue.put({"action": "top", "music": music_list[int(id)]})
+        message.reply("顶歌成功")
+
 @respond_to('local (.*)', re.IGNORECASE)
 def locals(message, start=0):
     try:
@@ -197,17 +208,18 @@ def show(message):
 
 @respond_to('help')
 def help(message):
-    message.reply("""
-    list %s 关键字搜索单曲
-    listp %s 关键字搜索歌单
-    add %s 添加歌曲（使用关键字搜索出的第一条）
-    addp %s 添加指定id歌单
-    detailp %s %d 查看指定id歌单的详情，需要填入offset，只返回10条结果
-    addid %d 添加指定id歌曲
-    addln %s （本地）添加歌曲
-    addli %d （本地）添加指定id歌曲
-    show    查看排队列表
-    start   开始播放
-    next    下一首歌（如果在播放歌单，则为歌单中下一首）
-    nextp   跳过当前歌单（跳到下一个记录）
-    stop    停止播放""")
+    message.reply(
+"""
+list %s 关键字搜索单曲
+listp %s 关键字搜索歌单
+add %s 添加歌曲（使用关键字搜索出的第一条）
+addp %s 添加指定id歌单
+detailp %s %d 查看指定id歌单的详情，需要填入offset，只返回10条结果
+addid %d 添加指定id歌曲
+addln %s （本地）添加歌曲
+addli %d （本地）添加指定id歌曲
+show    查看排队列表
+start   开始播放
+next    下一首歌（如果在播放歌单，则为歌单中下一首）
+nextp   跳过当前歌单（跳到下一个记录）
+stop    停止播放""")
